@@ -3,7 +3,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from config import EMBEDDING_MODEL_LANGCHAIN
 from typing import List, Dict, Optional
-import FAISS
+from langchain_community.vectorstores import FAISS
 
 @st.cache_resource
 def get_embedding_function():
