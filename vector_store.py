@@ -3,7 +3,6 @@ from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from config import EMBEDDING_MODEL_LANGCHAIN
 from typing import List, Dict, Optional
-from langchain_community.vectorstores import FAISS
 
 @st.cache_resource
 def get_embedding_function():
@@ -16,19 +15,26 @@ def get_embedding_function():
 
 @st.cache_resource
 def get_vector_db():
-    """返回内存版 FAISS 向量数据库"""
-    embedding_function = get_embedding_function()
-    # FAISS 需要先初始化为空库
-    return FAISS.from_texts([], embedding_function)
+    """返回内存版 FAISS 向量数据库（延迟初始化）"""
+    # 不要用空文本初始化
+    return None
 
 def add_texts_to_db(texts: List[str], metadatas: List[Dict]):
     """添加文本和元数据到向量数据库"""
-    db = get_vector_db()
-    db.add_texts(texts=texts, metadatas=metadatas)
+    db = st.session_state.get("vector_db")
+    embedding_function = get_embedding_function()
+    if db is None:
+        # 首次添加，初始化
+        db = FAISS.from_texts(texts, embedding_function, metadatas=metadatas)
+        st.session_state.vector_db = db
+    else:
+        db.add_texts(texts=texts, metadatas=metadatas)
 
 def search_db(query: str, k: int = 3) -> List:
     """在向量数据库中执行相似性搜索"""
-    db = get_vector_db()
+    db = st.session_state.get("vector_db")
+    if db is None:
+        return []
     try:
         return db.similarity_search(query, k=k)
     except Exception as e:
@@ -41,17 +47,20 @@ def delete_from_db_by_source_id(source_id: str):
 
 def clear_db():
     """清空向量数据库集合"""
-    get_vector_db.clear()
+    if "vector_db" in st.session_state:
+        del st.session_state["vector_db"]
 
 def load_existing_documents() -> Optional[List[Dict]]:
     """FAISS 不支持直接加载所有文档"""
     st.warning("FAISS 不支持直接加载所有文档。")
     return None
 
-def get_vector_count():
-    """返回向量数量"""
+def get_document_count() -> int:
+    """获取向量数据库中的文档数量"""
+    db = st.session_state.get("vector_db")
+    if db is None:
+        return 0
     try:
-        db = get_vector_db()
         return len(db.index_to_docstore_id)
     except Exception:
         return 0
