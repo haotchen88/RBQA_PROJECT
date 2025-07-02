@@ -64,3 +64,13 @@ def get_document_count() -> int:
         return len(db.index_to_docstore_id)
     except Exception:
         return 0
+
+def get_vector_count() -> int:
+    """返回当前向量库中的向量数量"""
+    db = st.session_state.get("vector_db")
+    if db is None:
+        return 0
+    try:
+        return len(db.index_to_docstore_id)
+    except Exception:
+        return 0
