@@ -1,9 +1,9 @@
 import streamlit as st
-from langchain.vectorstores import Chroma
+from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from config import EMBEDDING_MODEL_LANGCHAIN
 from typing import List, Dict, Optional
-import os
+import FAISS
 
 @st.cache_resource
 def get_embedding_function():
@@ -16,13 +16,13 @@ def get_embedding_function():
 
 @st.cache_resource
 def get_vector_db():
-    """始终返回内存版 ChromaDB，不做本地持久化"""
+    """返回内存版 FAISS 向量数据库"""
     embedding_function = get_embedding_function()
-    return Chroma(embedding_function=embedding_function)
+    # FAISS 需要先初始化为空库
+    return FAISS.from_texts([], embedding_function)
 
 def add_texts_to_db(texts: List[str], metadatas: List[Dict]):
     """添加文本和元数据到向量数据库"""
-    assert len(texts) == len(metadatas), f"texts({len(texts)})和metadatas({len(metadatas)})长度不一致"
     db = get_vector_db()
     db.add_texts(texts=texts, metadatas=metadatas)
 
@@ -36,40 +36,22 @@ def search_db(query: str, k: int = 3) -> List:
         return []
 
 def delete_from_db_by_source_id(source_id: str):
-    """根据source_id元数据删除向量"""
-    db = get_vector_db()
-    db.delete(where={"source_id": source_id})
+    """FAISS 不支持按元数据删除，需重建索引"""
+    st.warning("FAISS 不支持按元数据删除，如需此功能请用 ChromaDB。")
 
 def clear_db():
     """清空向量数据库集合"""
-    db = get_vector_db()
-    try:
-        db.delete_collection()
-    except Exception as e:
-        st.warning(f"清空向量数据库集合时出错: {e}。可能集合已不存在。")
     get_vector_db.clear()
 
 def load_existing_documents() -> Optional[List[Dict]]:
-    """加载向量数据库中现有的文档"""
-    try:
-        db = get_vector_db()
-        collection = db._collection
-        if collection is not None:
-            return collection.get(include=["metadatas", "documents"])
-        return None
-    except Exception as e:
-        st.error(f"加载现有文档失败: {str(e)}")
-        return None
+    """FAISS 不支持直接加载所有文档"""
+    st.warning("FAISS 不支持直接加载所有文档。")
+    return None
 
 def get_vector_count():
-    """安全获取向量数据库的条目数"""
+    """返回向量数量"""
     try:
         db = get_vector_db()
-        if hasattr(db, "collection") and hasattr(db.collection, "count"):
-            return db.collection.count()
-        elif hasattr(db, "_collection") and hasattr(db._collection, "count"):
-            return db._collection.count()
-        else:
-            return 0
-    except Exception as e:
+        return len(db.index_to_docstore_id)
+    except Exception:
         return 0

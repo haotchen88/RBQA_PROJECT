@@ -44,3 +44,4 @@ huggingface-hub>=0.16.0
 tokenizers>=0.13.0
 # 关键兼容性锁定
 protobuf==4.25.3
+faiss-cpu>=1.7.2
