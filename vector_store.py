@@ -1,7 +1,7 @@
 import streamlit as st
 from langchain.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
-from config import EMBEDDING_MODEL_LANGCHAIN, CHROMA_DB_PATH
+from config import EMBEDDING_MODEL_LANGCHAIN
 from typing import List, Dict, Optional
 import os
 
@@ -16,28 +16,15 @@ def get_embedding_function():
 
 @st.cache_resource
 def get_vector_db():
-    """初始化并返回ChromaDB实例"""
+    """始终返回内存版 ChromaDB，不做本地持久化"""
     embedding_function = get_embedding_function()
-    # 判断是否在 Streamlit Cloud（或其它无持久化环境）
-    if os.environ.get("STREAMLIT_CLOUD", "") or os.environ.get("STREAMLIT_ENV", "") or os.environ.get("HOME", "").startswith("/home/adminuser"):
-        # 云端环境，不设置 persist_directory
-        return Chroma(embedding_function=embedding_function)
-    else:
-        # 本地环境，允许持久化
-        return Chroma(
-            embedding_function=embedding_function,
-            persist_directory=CHROMA_DB_PATH
-        )
+    return Chroma(embedding_function=embedding_function)
 
 def add_texts_to_db(texts: List[str], metadatas: List[Dict]):
     """添加文本和元数据到向量数据库"""
     assert len(texts) == len(metadatas), f"texts({len(texts)})和metadatas({len(metadatas)})长度不一致"
     db = get_vector_db()
     db.add_texts(texts=texts, metadatas=metadatas)
-    
-    # 更新会话状态（如果需要）
-    if "vector_db" not in st.session_state:
-        st.session_state.vector_db = db
 
 def search_db(query: str, k: int = 3) -> List:
     """在向量数据库中执行相似性搜索"""
@@ -60,12 +47,6 @@ def clear_db():
         db.delete_collection()
     except Exception as e:
         st.warning(f"清空向量数据库集合时出错: {e}。可能集合已不存在。")
-    
-    # 重置会话状态
-    if "vector_db" in st.session_state:
-        del st.session_state.vector_db
-        
-    # 清理与DB相关的资源缓存，而不是所有缓存
     get_vector_db.clear()
 
 def load_existing_documents() -> Optional[List[Dict]]:
@@ -92,5 +73,3 @@ def get_vector_count():
             return 0
     except Exception as e:
         return 0
-
-#st.session_state.vector_db = get_vector_db()
